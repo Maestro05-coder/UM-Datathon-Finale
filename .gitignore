@@ -1,0 +1,26 @@
+# --- Local data caches: far too large for GitHub (2.3 GB) -------------------
+# Rebuild them locally with analysis/build_cache.py + build_cache_party.py
+analysis/cache_full/
+analysis/cache_party/
+*.parquet
+
+# --- Raw source data --------------------------------------------------------
+# The 10M-row (~4.95 GB) input CSV is not distributed here; put it next to the
+# analysis folder and rebuild the caches.
+swift_umdac_datathon_2026_fictitious_payment_data.csv
+*.csv
+
+# --- Python noise -----------------------------------------------------------
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# --- OS / editor noise ------------------------------------------------------
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
