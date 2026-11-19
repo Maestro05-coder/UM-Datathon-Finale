@@ -1,95 +1,111 @@
-# UM Datathon 2026 — reverse-engineering a synthetic SWIFT payment feed
+# UM Datathon 2026 — Swift case study
 
-This repository holds the full analysis for the **Universiti Malaya UMDAC Datathon 2026
-(Finals) — Swift Case Study**. We were given a 10,000,000-row, ~4.95 GB synthetic SWIFT-like
-payment file produced by a hidden generator, and asked to work out the rules that generated it
-per feature area ("group") and prove each rule with numbers.
+Two independent reconstructions of the same hidden generator, kept in one repository so
+every headline number can be read twice.
 
-Everything here is derived from that single CSV. No external data was used.
+`main` holds the group-level analysis on its own. This branch, `adam/submission-pack`,
+adds the submitted pack on top of it and leaves `main` untouched.
 
----
-
-## What was found (one headline rule per group)
-
-| group | feature area | headline rule |
+| layer | where | what it is |
 | :--- | :--- | :--- |
-| `g1_time` | when payments happen | One shared 24-hour template with two busy windows, stamped on each of 18 country **integer-hour clocks** (curve correlation −0.02 → +0.99 after alignment). The two windows hold statistically identical payments, so the "cut-off batch" story is dead. |
-| `g2_currency` | currencies & conversions | Currency is decided on the **sender side** (first bank 93% vs beneficiary 19%). Countries have home currencies (~92–97%); foreign payments lean EUR/USD toward the beneficiary; USD gets round-number amounts. **No FX-rate table exists.** |
-| `g3_amount` | amounts | Lognormal with one shared shape (σ≈1.05) around a **free per-country centre** ($48 Guinea-Bissau … $31k Monaco). Stable under split-half validation (r = 0.9977) and not explained by size, mix or route. USD has a whole-number {1,2,5}×10^k mode. **2.83% of rows are "storm" rows** (per day+currency injected base × integer multiples). |
-| `g4_banks` | banks & countries | **BIC8 is a fixed 8-slot layout** (4-digit pool of 1,075 numbers + country + one of 25 house letters + constant `0`; 0 exceptions in 25.8M appearances). **Type B adds a constant +0.865 dex (≈7.3×)** at every income level across 167 countries (sd 0.100). Banks also carry stable own tilts (split-half r = 0.93). |
-| `g5_routing` | banks a payment travels through | Type code = number of banks; `...` = a hidden intermediary (QFLAG N); ~5% hiding per link; conversion count follows its own rule; the endpoint columns disagree with the route ~5% of the time. |
-| `g6_fx_duration` | FX & duration | Total duration is the **sum of per-step delays**; conversions and hidden banks cost nothing. |
-| `g7_parties` | parties & text fields | All accounts are `_FAKE_...` (54% IBAN-shaped, prefix = bank country 100%); 391k sender accounts (78.6% of rows come from 29k whales) vs 2.6M one-off beneficiaries. TOKENS is the template of DETAILS (18 families). **Decoy rule:** sender address = bank country 100%, beneficiary address is a random-world pool (0.98% match). |
-| `g8_anomalies` | injected anomalies | FAT_FINGER confirmed as `honest × 10^k` with **k varying per row** (56.0% land back in the sender's middle 50% after ÷10–1,000 vs 34.7% clean). The "one fixed comma position" and "copy of a real payment" versions are refuted. Five other anomaly labels are dissected in its README. |
+| Group deep dives | `analysis/` and `analysis/groups/<group>/` | One DuckDB script per feature group, cached aggregates, and a README per group with the rules, the dead ends and proof rows. Includes `RULES_g1_g4.md`. |
+| Submitted pack | `submission/` | The 10-page dashboard, the 17-slide deck, the dataset anatomy report, and the second pipeline that builds them. |
 
-Each group folder (`analysis/groups/<group>/`) contains a `README.md` with the rules, the dead
-ends (with the numbers that killed them), chart explanations, and real rows from the CSV as
-proof, plus that group's charts.
-
----
-
-## Repository layout
+Both layers start from the single supplied file and nothing else:
 
 ```
-AGENTS.md                     working conventions for agents/contributors in this repo
-rules.md                      global method guardrails + chart design contract
-RULES_g1_g4.md                long-form write-up of groups 1–4
-*.pdf                         the original case-study brief
-analysis/
-  _common.py                  shared paths + DuckDB helpers (ddb, full_glob, rand_sample, savefig)
-  _style.py                   shared matplotlib style (one idea per chart, values on marks)
-  build_cache.py              builds cache_full/  (light columns + derived route features)
-  build_cache_party.py        builds cache_party/ (account + DETAILS/TOKENS text columns)
-  g0_map.py … g8_*.py         one entry script per group (+ control/follow-up scripts)
-  agg/                        cached aggregates (*.pkl) the chart-only scripts render from
-  groups/<group>/             README.md + charts, one folder per feature group
-  _archive/                   superseded scripts and charts (history only)
+swift_umdac_datathon_2026_fictitious_payment_data.csv    10,000,000 rows, ~4.95 GB
 ```
 
----
+The file is not in this repository. Place it at the repository root and both layers can
+be rebuilt from it.
 
-## Reproducing
+## The eight rules
 
-Requirements: Python 3.9+, and
+| # | rule | headline number | deep dive | pack page |
+| :-: | :--- | :--- | :--- | :-: |
+| 1 | Payments follow one working-day template stamped on local clocks, not a global clock | 17 clocks, pairwise agreement 0.19 → 0.98 | `analysis/groups/g1_time/` | 3 |
+| 2 | The currency is decided on the sender side; no FX-rate table exists | 93.4% bill at home, 73–98% across 113 markets | `analysis/groups/g2_currency/` | 4 |
+| 3 | Amounts are one lognormal shape around a free per-country centre | 650× from the poorest to the richest market | `analysis/groups/g3_amount/` | 5 |
+| 4 | A bank id is a fixed eight-slot code, and business payers add a constant premium | 0 exceptions in 25.8M appearances; 7.3× | `analysis/groups/g4_banks/` | 6 |
+| 5 | Route length is geometric, so bank count is the route type | 63% use two banks; 0.368 per extra bank | `analysis/groups/g5_routing/` | 7 |
+| 6 | Duration is the sum of per-bank step delays; conversions and hidden banks cost nothing | 39 s at two banks to 1,704 s at ten | `analysis/groups/g6_fx_duration/` | 8 |
+| 7 | A small pool of senders carries most of the volume, and the payer's address is real | 78.6% from 28,878 of 390,725 senders | `analysis/groups/g7_parties/` | 9 |
+| 8 | The six anomaly labels are distinct mechanisms, not a severity scale | 7,006 rows; 33 to 7,914 per 100,000 by destination | `analysis/groups/g8_anomalies/` | 10 |
+
+## Where the two derivations differ, and why
+
+The differences are denominators and statistics, not disagreements about the mechanism.
+Each is stated with its definition so neither number has to be taken on trust.
+
+| Item | Pack (`submission/`) | Deep dives (`analysis/`) | Reconciliation |
+| :--- | :--- | :--- | :--- |
+| Clock alignment | 17 clocks, pairwise agreement 0.19 → 0.98 | 18 clocks, similarity to a fitted template −0.02 → +0.99 | Same shift rule; the template figure is measured against a curve fitted to the same data, the pairwise figure needs no reference. The pack quotes the pairwise number. |
+| Country codes | 228 | 229 | 228 codes ever appear as a **sender** (`ER` never sends); 229 appear anywhere in a route. |
+| Banks | 8,386 endpoints | 8,727 | 8,727 is every bank in every visible route; 8,386 is endpoints only. Both reproduce exactly. |
+| Corridors | not quoted | 24,017 | Reproduced exactly on either pipeline. |
+| Storm rows | not quoted | 2.83% of rows | A real injected-amount mechanism found in the deep dives; not yet a pack panel. |
+
+## Layout
+
+```
+analysis/                    group deep dives: g0..g8 scripts, groups/, agg/, _archive/
+  _common.py                 paths, DuckDB helpers, reservoir sampler
+  _style.py                  the shared chart contract
+  build_cache.py             raw CSV -> cache_full/ (light columns + path features)
+  build_cache_party.py       raw CSV -> cache_party/ (accounts and text)
+  groups/<group>/README.md   rules, dead ends, proof rows, charts
+submission/                  the submitted pack
+  analysis/                  second pipeline: convert, refresh panels, verify, docs
+  dashboard/                 build.py + style.py + data/ + png/
+  deck/                      build_deck.py + PDF + PPTX
+  docs/                      Swift_Dashboard_Pack.pdf, dataset anatomy PDF/DOCX
+README.md                    this file
+rules.md                     method guardrails and chart contract
+RULES_g1_g4.md               long-form write-up of groups 1-4
+AGENTS.md                    working conventions for this repository
+```
+
+## Running each layer
+
+**Deep dives** (from the repository root):
 
 ```
 pip install -r requirements.txt
+python analysis/build_cache.py            # caching step, ~2.3 GB, once
+python analysis/build_cache_party.py
+cd analysis && python g1_time.py          # or g2_currency.py ... g8_anomalies.py
 ```
 
-1. Place `swift_umdac_datathon_2026_fictitious_payment_data.csv` in `analysis/` (it is **not**
-   in this repo — see below).
-2. Build the parquet caches once (they are what every script queries):
+**Submitted pack** (from `submission/`):
 
-   ```
-   python analysis/build_cache.py
-   python analysis/build_cache_party.py
-   ```
+```
+cd submission
+python analysis/convert_csv.py            # raw CSV -> analysis/payments.parquet, once
+python analysis/refresh_panels.py         # parquet -> dashboard/data/*.csv
+python dashboard/build.py                 # CSVs -> dashboard/png/*.png + docs/Swift_Dashboard_Pack.pdf
+python deck/build_deck.py                 # deck PDF + PPTX
+python analysis/verify.py --quick         # recompute the quoted numbers
+```
 
-3. Run any group script from the `analysis/` directory, for example:
+`verify.py --quick` passes 48 of 48 checks. Seven of its constants asserted pre-rebuild
+definitions and were updated to the rebuilt ones; `submission/README.md` lists the seven
+and why they moved.
 
-   ```
-   cd analysis
-   python g8_anomalies.py
-   ```
+The pack only ever reads the CSVs in `submission/dashboard/data/`, so every figure on
+every page can be checked from the committed tables without touching the parquet.
 
-   Chart-only scripts (`g5_charts.py`, `g6_charts.py`, `g7_charts.py`, `g8_charts.py`) render
-   the PNGs from the cached aggregates in `agg/`, so charts can be restyled without
-   re-streaming ten million rows. Full reruns take ~1–2 minutes per group.
+## Data and caches
 
-## What is *not* in this repo
+Everything large is ignored: the raw CSV, `analysis/cache_full/`, `analysis/cache_party/`,
+and `submission/analysis/payments.parquet`. The panel CSVs under
+`submission/dashboard/data/` are tracked on purpose: they are the audit trail behind the
+pack, which is why the root `.gitignore` carries an explicit exception for them.
 
-- The raw 4.95 GB source CSV.
-- `analysis/cache_full/` and `analysis/cache_party/` (~2.3 GB of parquet caches).
+## Provenance
 
-Both are excluded by `.gitignore`: they exceed GitHub's file/repo limits and are fully
-rebuildable with the two build scripts above. Everything else — code, cached aggregates,
-charts and documentation — is committed.
-
-## Method in one paragraph
-
-The raw CSV is never scanned directly; it is converted once to Parquet and then queried on all
-10M rows with DuckDB, so "full-data" really means full-data and no number in the READMEs comes
-from a sample. Sampling (random, never a stride) is used only to draw chart shapes. Every claim
-is paired with a **control**: anomalous rows are compared with clean rows (`ANOMALY_TYPE IS
-NULL`) holding the corridor, bank count and country fixed, and the clean baseline is reported
-next to the effect. Negative results are documented too. See `rules.md` for the full contract.
+- `analysis/`, `rules.md`, `RULES_g1_g4.md`, `AGENTS.md`: `Maestro05-coder/UM-Datathon-Finale`
+  at `77eb612`, imported unchanged.
+- `submission/`: `adamzikry870-dev/swift-umdatathon` at `0c478db`, imported as one commit.
+- The earlier ten-panel dashboard specification was retired when the pack was rebuilt and
+  now lives inside `submission/analysis/archive.zip` under `archive/superseded/`.
