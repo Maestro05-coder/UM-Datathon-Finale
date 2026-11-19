@@ -3,5 +3,6 @@
   "whales": 28878,
   "whale_share": 0.786129162090961,
   "beneficiary_accounts": 2589757,
+  "beneficiary_accounts_definition": "distinct beneficiaries on clean rows (ANOMALY_TYPE IS NULL)",
   "total_payments": 9992994
 }

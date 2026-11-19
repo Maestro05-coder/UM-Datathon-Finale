@@ -250,8 +250,8 @@ def page_cover(pdf=None):
              fontsize=12.5, color=S.BODY, va="top", linespacing=1.50)
 
     for i, (label, value) in enumerate([("payments", "10,000,000"),
-                                        ("fields", "21"),
-                                        ("days", "90")]):
+                                        ("fields", "20"),
+                                        ("days", "92")]):
         fig.text(0.065 + i * 0.175, 0.268, value, fontsize=19, color=S.PLUM,
                  fontweight="bold")
         fig.text(0.065 + i * 0.175, 0.236, label, fontsize=S.FS["stat_label"],
@@ -285,8 +285,9 @@ def page_method(pdf=None):
 
     steps = [
         ("1", "Full data, never a sample",
-         "Every count, median and ratio comes from all 10,000,000 rows. Samples are "
-         "used only to draw a chart shape."),
+         "Every count, median and ratio uses the full file: all 10,000,000 rows, "
+         "or the 9,992,994 clean rows where a rule excludes the injected labels. "
+         "Samples draw chart shapes only."),
         ("2", "Hold everything else fixed",
          "Compare inside one corridor, one chain length or one client class, so the "
          "effect cannot be the composition."),
@@ -354,7 +355,7 @@ def page_time(pdf=None):
         3, "Group 1 of 8  \u00b7  When payments happen",
         "Countries keep their own working day",
         "One template, stamped on 113 local clocks. Read each country at its own hour "
-        "and the same day appears 17 times; read them all at UTC and it smears into nothing.")
+        "and the same day appears 18 times; read them all at UTC and it smears into nothing.")
 
     ax = axes_at(fig, panel([0.135, 0.180, 0.445]))
     heat(ax, m, 0, 24)
@@ -380,18 +381,19 @@ def page_time(pdf=None):
 
     meta = jload("hour_meta.json")
     rail(fig, [
-        (f"{meta['offsets']}", "distinct clocks in the file"),
-        (f"{meta['pairwise_after']:.2f}", "agreement between any two countries"),
+        (f"{meta['offsets']}", "distinct whole-hour clocks in the file"),
+        (f"{meta['pairwise_after']:.2f}", "pairwise agreement between any two countries"),
         (f"{meta['pairwise_before']:.2f}", "the same countries on one clock"),
     ], [
         ("CONDITION", "country of the first bank on the route"),
         ("EFFECT", "one curve, slid by whole hours"),
-        ("SCOPE", f"{meta['countries']} markets, {meta['offsets']} offsets"),
+        ("SCOPE", f"{meta['countries']} markets, {meta['offsets']} whole-hour clocks"),
     ], "the same curves left on UTC, which agree 0.19")
 
-    takeaway(fig, "Time features must be built on each country's own clock. The day opens "
-                  "at 05:00 everywhere, dips at lunch and closes after 22:00; on a single "
-                  "global clock those 17 days land in 17 different places.")
+    takeaway(fig, "Time features must be built on each country's own clock. On that clock the "
+                  "main window is 22:00–02:00, the dead zone 06:00–12:00 and the second hump "
+                  "13:00–16:00; on one global clock those 18 days scatter, and aligning them "
+                  "lifts pairwise agreement from 0.19 to 0.98.")
     return save(fig, "02_when", pdf)
 
 
@@ -440,8 +442,8 @@ def page_currency(pdf=None):
     ], "the payee's own currency, which a shared-currency model would predict")
 
     takeaway(fig, "Currency is a property of the payer, so an FX exposure model built on "
-                  "destination is measuring the wrong side. A payment billed in the payee's "
-                  "currency is one that happens to travel inside a single currency area.")
+                  "destination is measuring the wrong side. A foreign label is a sender-side "
+                  "choice that leans to the payee's home currency, not a priced conversion.")
     return save(fig, "03_currency", pdf)
 
 
@@ -523,7 +525,7 @@ def page_amount(pdf=None):
     ], [
         ("CONDITION", "the sender's market, shape held fixed"),
         ("EFFECT", "one lognormal, centre moves with market"),
-        ("SCOPE", "158 markets; width 1.02 to 1.08 dex"),
+        ("SCOPE", "158 markets; width 0.96-1.13 dex (middle 80%: 1.02-1.08)"),
     ], "the pooled normal fit, which every market sits on once its centre is removed")
 
     takeaway(fig, "Amount carries one free parameter per market: where the centre sits. "
@@ -634,11 +636,11 @@ def page_chain(pdf=None):
     rail(fig, [
         (f"{share2*100:.0f}%", "of payments use exactly two banks"),
         (f"{r:.3f}", "the chance of one more bank, at every step"),
-        ("0 of 2,338", "country pairs that ever convert"),
+        ("0 of 2,338", "country pairs that convert only sometimes"),
     ], [
         ("CONDITION", "the visible chain and the banks at each hop"),
         ("EFFECT", "each extra bank is 0.368 as likely as the last"),
-        ("SCOPE", f"chains of 2 to {k_max} banks, 2,338 country pairs"),
+        ("SCOPE", f"chains of 2 to 22 banks (chart: 2 to {k_max}), 2,338 country pairs"),
     ], "one geometric law fitted on two to ten banks and extended across the tail")
 
     takeaway(fig, "Chain length is a single parameter, not a policy choice, so long chains are "
@@ -795,7 +797,7 @@ def page_anomaly(pdf=None):
 
     fig = new_page(
         10, "Group 8 of 8  \u00b7  What goes wrong",
-        "Six labels, six mechanisms, and one null",
+        "Six labels, five mechanisms and one null",
         "Top: the typical and 90th-percentile ticket per label, with clean payments in the "
         "middle. Bottom: how soon an identical payment repeats. Neither test alone separates "
         "all six.")
@@ -861,16 +863,16 @@ def page_anomaly(pdf=None):
     rail(fig, [
         ("7,006", "flagged rows, 0.07% of the file"),
         ("33 to 7,914", "flags per 100,000, by destination"),
-        ("56%", "of fat-finger rows fix on \u00f7100"),
+        ("56%", "fat-finger rescue by \u00f710-1,000 vs 34.7% clean"),
     ], [
         ("CONDITION", "the label, the route, the repeat timing"),
         ("EFFECT", "three labels move amount, one moves timing"),
-        ("SCOPE", "7,006 rows, six labels, 233 destinations"),
+        ("SCOPE", "7,006 rows, six labels, 167 destinations"),
     ], "clean payments: the ochre row above, the pale bars below")
 
-    takeaway(fig, "The labels are mechanisms, not severities. A single anomaly score would "
-                  "average a decimal shift, a timing pattern and two labels that look exactly "
-                  "like normal payments.")
+    takeaway(fig, "The labels are mechanisms, not severities. A single score would blend "
+                  "three amount signatures, one repeat-timing signature and two labels that "
+                  "look ordinary on these charts.")
     return save(fig, "09_anomaly", pdf)
 
 

@@ -166,7 +166,12 @@ def hours(con) -> None:
     keep = total[total >= 5000].index.astype(str).tolist()
     print(f"  {len(keep)} countries with at least 5,000 payments")
 
-    ref = piv.loc[keep].sum(axis=0).values.astype(float)
+    # Use the busiest country's own curve as the reference, exactly as the g1
+    # deep-dive does. A pooled reference collapses two adjacent generator clocks
+    # into one because the template has a flat top, which is why an earlier build
+    # of this panel reported 17 offsets instead of the generator's 18.
+    ref_c = max(keep, key=lambda c: piv.loc[c].sum())
+    ref = piv.loc[ref_c].values.astype(float)
     ref = ref / ref.sum()
 
     rows, aligned, normalised = [], [], []
@@ -184,14 +189,14 @@ def hours(con) -> None:
     save(tz, "tz_shift.csv")
 
     # two ways of asking "do the country curves agree with each other":
-    # against the pooled curve, and pairwise across all countries
+    # against the shared template, and pairwise across all countries
     def pairwise(m):
         c = np.corrcoef(np.vstack(m))
         k = len(m)
         return float((c.sum() - np.trace(c)) / (k * (k - 1)))
 
     pair_raw, pair_align = pairwise(normalised), pairwise(aligned)
-    print(f"  vs pooled:   before {tz.corr_raw.mean():.3f}  after {tz.corr_aligned.mean():.3f}")
+    print(f"  vs template: before {tz.corr_raw.mean():.3f}  after {tz.corr_aligned.mean():.3f}")
     print(f"  pairwise:    before {pair_raw:.3f}  after {pair_align:.3f}")
     print(f"  distinct whole-hour offsets: {tz.offset.nunique()}")
 
@@ -205,8 +210,8 @@ def hours(con) -> None:
     (OUT / "hour_meta.json").write_text(json.dumps({
         "countries": len(keep), "offsets": int(tz.offset.nunique()),
         "pairwise_before": pair_raw, "pairwise_after": pair_align,
-        "pooled_before": float(tz.corr_raw.mean()),
-        "pooled_after": float(tz.corr_aligned.mean()),
+        "template_before": float(tz.corr_raw.mean()),
+        "template_after": float(tz.corr_aligned.mean()),
     }, indent=2), encoding="utf-8")
 
 
@@ -249,7 +254,10 @@ def parties(con) -> None:
     save(lorenz, "sender_lorenz.csv")
 
     meta = {"accounts": n_accounts, "whales": whale, "whale_share": whale_share,
-            "beneficiary_accounts": ben, "total_payments": int(d.n.sum())}
+            "beneficiary_accounts": ben,
+            "beneficiary_accounts_definition":
+                "distinct beneficiaries on clean rows (ANOMALY_TYPE IS NULL)",
+            "total_payments": int(d.n.sum())}
     (OUT / "party_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"  {n_accounts:,} accounts; {whale:,} with 50+ rows carry {whale_share*100:.1f}%")
     print(f"  {ben:,} distinct beneficiaries")

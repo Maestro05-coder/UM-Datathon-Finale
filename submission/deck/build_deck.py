@@ -266,7 +266,7 @@ for i, (v, l) in enumerate([("10.0 M", "payments analysed\nin full"),
                             ("3", "claims we withdrew\nafter testing")]):
     stat(M + i * 1.92, 2.72, v, l, color=PLUM if i else INK, width=19, size=21)
 
-T(M, 1.62, "17 slides  ·  8 feature groups  ·  every figure recomputed on all 10,000,000 rows",
+T(M, 1.62, "17 slides  ·  8 feature groups  ·  every figure can be recomputed from the supplied file",
   size=10, color=MUTED)
 T(M, 0.55, "Prepared for submission  ·  No external data was used at any point",
   size=8.5, color=FAINT)
@@ -343,7 +343,7 @@ rules = [
     ("05  How long the chain", "63% use two banks; each extra bank is 37% as likely as the last."),
     ("06  How long it takes", "Duration is the sum of the legs; currency and hidden hops add nothing."),
     ("07  Who is paying whom", "390k senders carry the volume; 2.6M beneficiaries are effectively one-off."),
-    ("08  What goes wrong", "Six exception labels, six mechanisms, and a strong country pattern."),
+    ("08  What goes wrong", "Six labels: five mechanisms, one null, and a country pattern."),
 ]
 x0, y0 = M, 5.20
 cw, ch = 6.02, 0.98
@@ -473,7 +473,7 @@ T(M + 7.60, 5.22, "EFFECT ON THE RESULTS", size=7.8, color=MUTED, weight="bold",
 issues = [
     ("No missing values in 19 of 20 fields; only the exception label is empty (99.93%).",
      "Treat a blank label as ordinary traffic.",
-     "Clean base of 9,992,994 rows, used for every rule."),
+     "Clean base of 9,992,994 rows; anomaly rules use the 7,006 labels."),
     ("7,006 rows carry an injected exception label (0.07%).",
      "Analyse them separately; exclude from rule-fitting.",
      "Rules describe clean traffic, not the injected tail."),
@@ -482,7 +482,7 @@ issues = [
      "Local-currency share moves from 89.4% to 93.4%."),
     ("Timestamps form 18 whole-hour clocks, not 24 real time zones.",
      "Never convert to a global clock; align each country to its own peak.",
-     "Cross-country agreement rises from 0.19 to 0.99."),
+     "Pairwise cross-country agreement rises from 0.19 to 0.98."),
     ("One amount column, already in a common unit, and no local-currency value.",
      "No exchange rate can be recovered; do not model conversion as a price.",
      "Retires the daily-rate-table hypothesis outright."),
@@ -550,7 +550,7 @@ para(M, 5.78, (
     "a second hump after lunch, stamped on its own whole-hour clock. Read on a "
     "single global clock the 113 country curves agree only weakly. Shifted onto "
     "their own hour they collapse onto one shape."), size=11.4, width=50)
-stat(M, 3.60, "0.19 → 0.99", "agreement between country curves, before and after alignment", width=22, size=19)
+stat(M, 3.60, "0.19 → 0.98", "pairwise agreement between country curves, before and after alignment", width=22, size=19)
 stat(M + 2.00, 3.60, "18", "distinct whole-hour clocks cover 113 countries", width=20)
 stat(M + 3.34, 3.60, "11.2%", "of volume arrives at the weekend, against 28.6% if days were equal", width=23)
 
@@ -666,11 +666,11 @@ hline(M, RIGHT, 6.02)
 para(M, 5.78, (
     "A bank identifier is a rigid eight-slot code: a four-digit number, a "
     "country, a house letter fixed per country, and a constant. Beyond the "
-    "country ladder, business payers send 7.3× the retail median in all 167 "
-    "measurable markets, and the two ends of a payment stack to 49×."),
+    "country ladder, business payers send a median 7.3× the retail across 167 "
+    "markets (3.3×–15×), and the two ends of a payment stack to 49×."),
     size=11.4, width=50)
 stat(M, 3.52, "25.8 M", "bank appearances, zero exceptions to the code layout", width=21)
-stat(M + 1.80, 3.52, "7.3×", "corporate over retail median, in 167 of 167 markets", width=21)
+stat(M + 1.80, 3.52, "7.3×", "median corporate / retail, 167 markets (3.3-15×)", width=21)
 stat(M + 3.18, 3.52, "49×", "business-to-business over consumer-to-consumer", width=21)
 
 ax = chart((5.95, 2.06, 6.78, 3.50))
@@ -761,7 +761,7 @@ para(M, 5.78, (
     "penalty for covered routes is a mix of corridors."), size=11.4, width=50)
 stat(M, 3.52, "20×", "slower at six banks than at two", width=20)
 stat(M + 1.44, 3.52, "+0 s", "added by a currency conversion, at every chain length", width=21)
-stat(M + 3.02, 3.52, "0.7×", "covered versus ordinary inside the same bank pair", width=22)
+stat(M + 3.02, 3.52, "1.1×", "covered vs indirect, same corridor + middle bank", width=22)
 
 ax = chart((5.95, 2.06, 6.78, 3.50))
 d = dur[dur.pc <= 8]
@@ -794,12 +794,12 @@ kicker("Group 7 of 8  ·  Who is paying whom")
 headline("Senders repeat. Beneficiaries do not, and the payee address is decoration")
 hline(M, RIGHT, 6.02)
 para(M, 5.78, (
-    "390,725 sending accounts produce ten million payments, and 28,889 of them "
-    "carry 78.6% of the volume. Beneficiaries are effectively one-off: 2.59 "
-    "million accounts. The payer's address always sits in the country of the "
-    "bank named on the payment; the payee's address agrees only 0.98% of the "
-    "time."), size=11.4, width=50)
-stat(M, 3.52, "391k", "sending accounts, against 2.59 M beneficiaries", width=21)
+    "On clean rows, 390,725 sending accounts produce 9.99 million payments, and "
+    "28,889 of them carry 78.6% of the volume. Beneficiaries are effectively "
+    "one-off: 2.59 million accounts. The payer's address always sits in the "
+    "country of the bank named on the payment; the payee's address agrees only "
+    "0.98% of the time."), size=11.4, width=50)
+stat(M, 3.52, "391k", "clean sending accounts, against 2.59 M beneficiaries", width=21)
 stat(M + 1.72, 3.52, "78.6%", "of payments come from 7% of the sending accounts", width=21)
 stat(M + 3.16, 3.52, "100% / 1%", "payer address matches the named bank; the payee's does not", width=23)
 
@@ -819,7 +819,7 @@ ax.set_ylim(0, 100)
 ax.set_xlabel("sending accounts, largest first (share of all accounts)")
 ax.set_ylabel("cumulative share of payments (%)")
 ax.legend(loc="lower right", frameon=False, fontsize=8.8)
-caption("Concentration curve over 390,725 sending accounts. The dashed line is a book with no large senders.")
+caption("Concentration curve over 390,725 clean sending accounts. The dashed line is a book with no large senders.")
 strip("This is the shape of a business payments platform: a few corporate originators push volume to a "
       "long tail of suppliers. It is also a warning. Free-text geography on the payee side is noise, so "
       "a model that learns from it learns nothing.")
@@ -830,16 +830,17 @@ save(fig, pdf, n)
 n += 1
 fig = new_slide()
 kicker("Group 8 of 8  ·  What goes wrong")
-headline("Six exception types, six fingerprints, and they cluster by country")
+headline("Six labels, five fingerprints, one null, and a country pattern")
 hline(M, RIGHT, 6.02)
 para(M, 5.78, (
-    "Each label is a distinct mechanism, not a severity score. A fat-finger is "
-    "an honest amount with the decimal point moved; a duplicate is the same "
-    "trio re-sent within eighteen minutes; a romance scam is two to eight "
-    "escalating payments inside the hour. The three scams avoid covered routes; "
-    "the three operational errors use them normally."), size=11.2, width=50)
+    "Five labels are distinct mechanisms, not severity scores; CUSTOMER_RECALL "
+    "has no payment-level signature. A fat-finger is an honest amount with the "
+    "decimal point moved; a duplicate is the same trio re-sent within eighteen "
+    "minutes; a romance scam is two to eight escalating payments inside the hour. "
+    "The three scams avoid covered routes; the other three ride the normal mix."),
+    size=11.2, width=50)
 stat(M, 3.30, "7,006", "flagged rows, 0.07% of the file", width=21)
-stat(M + 1.52, 3.30, "56%", "of fat-finger rows return to normal after ÷100 or ÷1,000", width=23)
+stat(M + 1.52, 3.30, "56%", "fat-finger rescue by ÷10-1,000; clean 34.7%", width=23)
 stat(M + 3.26, 3.30, "7,914", "flags per 100k in Pakistan, against 33 in the United States", width=23)
 
 ax = chart((5.95, 2.06, 6.78, 3.50))
@@ -864,9 +865,9 @@ ax.set_xticklabels(["10", "100", "1,000", "10,000"])
 ax.set_xlabel("flagged payments per 100,000, log scale")
 ax.grid(axis="y", visible=False)
 caption("Beneficiary countries with at least 1,000 payments; the United States is shown in grey.")
-strip("Three labels are social engineering and three are operational error, which is why they differ in "
-      "the route mix: a fraudster chooses a cheap route, an honest mistake rides the normal one. Geography "
-      "is a portfolio effect, not a format one.")
+strip("Three labels are social engineering and three are not, and that shows in the route mix: the scams "
+      "ride covered routes 0.1-0.7% of the time, the others 4.5-4.7%. Geography is a portfolio effect, "
+      "not a format one.")
 footer(n)
 save(fig, pdf, n)
 
@@ -966,7 +967,7 @@ T(7.05, 5.66, "THE HONEST LIMITS", size=8.2, color=OCHRE, weight="bold")
 lims = [
     "The file is synthetic. Every rule describes this generator, not the market.",
     "Country wealth is a dial here, not a causal claim about GDP: the file contains no GDP.",
-    "Medians add; individual payments do not. Row-level duration is not forecastable (R² ≈ 0.2).",
+    "Duration is near-deterministic given the exact bank pair, but not forecastable from amount, hour or label alone (R² ≈ 0.2).",
     "Three earlier claims were corrected or withdrawn after testing. Treat any single number as provisional until it replicates.",
 ]
 yy = 5.36

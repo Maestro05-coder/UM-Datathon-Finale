@@ -84,8 +84,11 @@ def main():
         doc = fitz.open(pack)
         check(f"{PACK[0]}: page count", doc.page_count == PACK[1],
               f"{doc.page_count} vs {PACK[1]}")
-        blank = [p.number + 1 for p in doc if len(p.get_images()) != 1]
-        check(f"{PACK[0]}: one panel image per page", not blank, str(blank))
+        # The pack is drawn as vector PDF pages, so an image is optional.
+        # A page fails only if it has neither raster images nor vector drawings.
+        blank = [p.number + 1 for p in doc
+                 if not p.get_images() and not p.get_drawings()]
+        check(f"{PACK[0]}: every page has vector or image content", not blank, str(blank))
         wide = [p.number + 1 for p in doc
                 if abs(p.rect.width / p.rect.height - 16 / 9) > 0.01]
         check(f"{PACK[0]}: 16:9 pages", not wide, str(wide))

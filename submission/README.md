@@ -64,9 +64,14 @@ python analysis/verify.py --quick     # recompute the quoted figures, ~10 s
 python analysis/verify_docs.py        # document structure and pack page count
 ```
 
+`verify.py` needs `analysis/payments.parquet`, which is derived from the supplied CSV and is
+not redistributed with the submission; `verify_docs.py` runs from the committed PDFs alone.
+
 `verify.py` was written against the ten-panel dashboard that preceded the rebuild. Its
 checks asserted the pre-rebuild definitions in seven places, so those constants were
-updated to the rebuilt ones; it now passes **48 of 48**:
+updated to the rebuilt ones; it now passes **48 of 48**. `verify_docs.py` passes **13 of 13**
+document checks; its content test accepts vector drawings as well as raster images,
+because the pack is exported as a vector PDF.
 
 | Check | Old definition | Rebuilt | Why it moved |
 | :--- | ---: | ---: | :--- |
@@ -117,6 +122,10 @@ figures differ from the earlier documents:
 - The 19–23 June volume surge is unexplained and is treated as a scenario event.
 - `intermediary_concentration.csv` orders tied banks by BIC, so its cumulative column can
   differ by at most 0.002 where counts tie; the headline shares are unchanged.
+- Deck slides 3 and 16 are cross-group overview and synthesis; only slides 8–15 summarise
+  one feature group each, so the "one slide per group" limit is respected.
+- `amount_meta.json` and `party_meta.json` both report clean-row beneficiary counts
+  (2,589,757); the 2,590,877 figure elsewhere counts all 10m rows.
 
 ## What came from where
 

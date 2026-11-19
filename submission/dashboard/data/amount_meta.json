@@ -1,5 +1,6 @@
 {
   "median_amount": 3662.58,
   "clean_rows": 9992994,
-  "beneficiary_accounts": 2590877
+  "beneficiary_accounts": 2589757,
+  "beneficiary_accounts_definition": "distinct beneficiaries on clean rows (ANOMALY_TYPE IS NULL)"
 }
