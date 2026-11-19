@@ -88,8 +88,9 @@ python deck/build_deck.py                 # deck PDF + PPTX
 python analysis/verify.py --quick         # recompute the quoted numbers
 ```
 
-`verify.py` still asserts seven pre-rebuild constants; `submission/README.md` lists them and
-why they moved. They are the first item to fix when the dashboard is next revised.
+`verify.py --quick` passes 48 of 48 checks. Seven of its constants asserted pre-rebuild
+definitions and were updated to the rebuilt ones; `submission/README.md` lists the seven
+and why they moved.
 
 The pack only ever reads the CSVs in `submission/dashboard/data/`, so every figure on
 every page can be checked from the committed tables without touching the parquet.

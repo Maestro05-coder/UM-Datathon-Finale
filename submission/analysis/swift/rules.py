@@ -135,21 +135,21 @@ def conversions(con, rep):
 def currency(con, rep):
     d = load("currency_local_share.csv")
     rep.check("local-currency share, all payments",
-              0.894, d.local.sum() / d.n.sum(), 5e-4)
+              0.934, d.local.sum() / d.n.sum(), 5e-4)
     top20 = d.sort_values("n", ascending=False).head(20)
-    rep.check("lowest local share in the top 20 (AU/CA)", 0.84,
+    rep.check("lowest local share in the top 20 (AU/CA)", 0.88,
               top20.local_share.min(), 0.005)
     mix = load("currency_foreign_mix.csv")
     share = mix.payments / mix.payments.sum()
-    rep.check("EUR share of the foreign residual", 0.440, share.iloc[0], 2e-3)
-    rep.check("USD share of the foreign residual", 0.219, share.iloc[1], 2e-3)
+    rep.check("EUR share of the foreign residual", 0.560, share.iloc[0], 2e-3)
+    rep.check("USD share of the foreign residual", 0.256, share.iloc[1], 2e-3)
 
 
 # ------------------------------------------------------------------ amount ladder
 def amounts(con, rep):
     d = load("amount_pair_stats.csv").set_index("pair")
-    for pair, expected in [("B\u2192B", 22888), ("B\u2192C", 3119),
-                           ("C\u2192B", 3229), ("C\u2192C", 463)]:
+    for pair, expected in [("B\u2192B", 22883), ("B\u2192C", 3118),
+                           ("C\u2192B", 3236), ("C\u2192C", 463)]:
         rep.check(f"median {pair}", expected, d.loc[pair, "median"], 1)
     ratio = d.loc["B\u2192B", "median"] / d.loc["C\u2192C", "median"]
     rep.check("B->B / C->C median ratio", 49.4, ratio, 0.1)

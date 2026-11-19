@@ -64,11 +64,11 @@ python analysis/verify.py --quick     # recompute the quoted figures, ~10 s
 python analysis/verify_docs.py        # document structure and pack page count
 ```
 
-`verify.py` was written against the ten-panel dashboard that preceded the rebuild. Against
-the rebuilt panels it currently passes **41 of 48** quick checks; the seven failures all
-assert the pre-rebuild definitions:
+`verify.py` was written against the ten-panel dashboard that preceded the rebuild. Its
+checks asserted the pre-rebuild definitions in seven places, so those constants were
+updated to the rebuilt ones; it now passes **48 of 48**:
 
-| Check | Documented | Now | Why it moved |
+| Check | Old definition | Rebuilt | Why it moved |
 | :--- | ---: | ---: | :--- |
 | local-currency share | 0.894 | 0.934 | sender country now read from the route's first bank, not `ORDERING_BIC8` |
 | lowest local share (AU/CA) | 0.84 | 0.88 | same |
@@ -78,9 +78,6 @@ assert the pre-rebuild definitions:
 | median B→C | 3,119 | 3,118 | same |
 | median C→B | 3,229 | 3,236 | same |
 
-Those checks need their expected values updated to the rebuilt definitions. The checks
-themselves are correct; only the constants they assert are stale.
-
 ## What the pack shows
 
 One page per rule, in the order the deep dives use:
@@ -89,14 +86,14 @@ One page per rule, in the order the deep dives use:
 | :-: | :--- | :--- |
 | 1 | Cover | eight groups indexed, ten million rows, no external data |
 | 2 | Method | the four tests applied to every rule, plus the findings that were withdrawn |
-| 3 | When payments happen | 113 country curves on their own clocks against the same curves on one global clock |
+| 3 | When payments happen | 113 country days lined up on their own clocks, against the 0.19 agreement they have on one global clock |
 | 4 | Which currency | 113 sender markets ranked against a 100% home-currency line |
-| 5 | How much | the 158-market country ladder against the pooled median |
-| 6 | Banks and parties | business against retail tickets in 167 markets, with the no-effect line |
-| 7 | The chain | observed chain lengths against one geometric law |
+| 5 | How much | 158 markets pooled after removing each one's median, against a single normal curve |
+| 6 | Banks and client class | business-to-retail ticket in 167 markets, ranked against the 7.3x constant and the 1x floor |
+| 7 | The chain | 16 chain lengths against one geometric law, in standard errors |
 | 8 | Duration | median and p10–p90 band, with conversion payments overlaid |
-| 9 | Parties | the sender Lorenz curve against a book where every account carries equal volume |
-| 10 | Anomalies | destination rates against the file average |
+| 9 | Parties | each destination's payee addresses by the country they name, against the bank's own country |
+| 10 | Anomalies | median and p90 ticket per label, then the repeat gap of 494 duplicate pairs against 3,125 clean pairs |
 
 Every number drawn on a page is written to `dashboard/data/` as a CSV first, and
 `dashboard/build.py` reads only those CSVs. No figure queries the parquet directly.

@@ -1,0 +1,14 @@
+bucket,grp,n
+1-3 days,normal,138
+1-6 hours,duplicate,39
+1-6 hours,normal,284
+10-30 min,duplicate,182
+10-30 min,normal,26
+2-10 min,duplicate,120
+2-10 min,normal,8
+3-90 days,normal,2305
+30-60 min,duplicate,116
+30-60 min,normal,40
+6-24 hours,normal,318
+under 2 min,duplicate,37
+under 2 min,normal,6

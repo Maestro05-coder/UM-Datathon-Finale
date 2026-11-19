@@ -255,14 +255,264 @@ def parties(con) -> None:
     print(f"  {ben:,} distinct beneficiaries")
 
 
+def currency_two_sides(con) -> None:
+    step("currency: the same payment read from each side of the route")
+    d = con.execute(f"""
+        with base as (
+            select {PATH_C} as oc, {PATH_B} as bc, CURRENCY_CODE as cur from '{P}'
+        ), from_side as (
+            select oc, cur, count(*) as n from base group by 1, 2
+        ), to_side as (
+            select bc, cur, count(*) as n from base group by 1, 2
+        ), h_from as (
+            select oc, cur as hc
+            from (select *, row_number() over (partition by oc order by n desc) rk from from_side)
+            where rk = 1
+        ), h_to as (
+            select bc, cur as hc
+            from (select *, row_number() over (partition by bc order by n desc) rk from to_side)
+            where rk = 1
+        )
+        select base.oc as cc, count(*) as n,
+               avg(case when base.cur = h_from.hc then 1.0 else 0.0 end) as payer_local,
+               avg(case when base.cur = h_to.hc then 1.0 else 0.0 end) as payee_local
+        from base
+        join h_from on h_from.oc = base.oc
+        join h_to on h_to.bc = base.bc
+        group by 1 having count(*) >= 5000 order by n desc
+    """).df()
+    save(d, "currency_two_sides.csv")
+    payer = float((d.payer_local * d.n).sum() / d.n.sum())
+    payee = float((d.payee_local * d.n).sum() / d.n.sum())
+    print(f"  {len(d)} markets; payer side {payer*100:.2f}%, payee side {payee*100:.2f}%")
+
+
+def country_shape(con) -> None:
+    step("amounts: centre and width per market, plus a deterministic half split")
+    d = con.execute(f"""
+        with b as (
+            select {PATH_C} as cc, log10(USD_AMOUNT) as la,
+                   hash(ORDERING_ACCOUNT || '|' || BENEFICIARY_ACCOUNT || '|' ||
+                        EPOCH_SECONDS::varchar || '|' || USD_AMOUNT::varchar) % 2 as half
+            from '{P}' where USD_AMOUNT > 0 and {CLEAN}
+        )
+        select cc, count(*) as n,
+               median(la) as centre,
+               (quantile_cont(la, 0.84) - quantile_cont(la, 0.16)) / 2 as width,
+               median(case when half = 0 then la end) as centre_a,
+               median(case when half = 1 then la end) as centre_b
+        from b group by 1 having count(*) >= 2000 order by n desc
+    """).df()
+    save(d, "country_shape.csv")
+    print(f"  {len(d)} markets; width {d.width.median():.3f} dex at the median")
+
+
+def amount_centred(con) -> None:
+    step("amounts: every payment expressed as distance from its own market's centre")
+    d = con.execute(f"""
+        with b as (
+            select {PATH_C} as cc, log10(USD_AMOUNT) as la
+            from '{P}' where USD_AMOUNT > 0 and {CLEAN}
+        ), m as (
+            select cc, median(la) as c from b group by 1 having count(*) >= 2000
+        )
+        select b.cc as cc, round((b.la - m.c) / 0.1) * 0.1 as bin, count(*) as n
+        from b join m using (cc)
+        where abs(b.la - m.c) <= 2.0
+        group by 1, 2 order by 1, 2
+    """).df()
+    save(d, "amount_centred.csv")
+    print(f"  {d.cc.nunique()} markets x {d.bin.nunique()} bins")
+
+
+def settlement_grid(con) -> None:
+    step("duration: median settlement time by chain length and amount decile")
+    d = con.execute(f"""
+        with b as (
+            select PARTICIPANT_COUNT as pc, TOTAL_DURATION as d, USD_AMOUNT as a
+            from '{P}'
+            where PARTICIPANT_COUNT between 2 and 10 and USD_AMOUNT > 0 and {CLEAN}
+        ), g as (
+            select *, ntile(10) over (order by a) as dec from b
+        )
+        select pc, dec, count(*) as n, median(d) as med
+        from g group by 1, 2 order by 1, 2
+    """).df()
+    save(d, "settlement_grid.csv")
+    print(f"  {d.pc.nunique()} chain lengths x {d.dec.nunique()} amount deciles")
+
+
+def address_vs_volume(con) -> None:
+    step("parties: where each side's address points, against where the payment goes")
+    d = con.execute(f"""
+        with b as (
+            select regexp_extract(BENEFICIARY_TOKENS,
+                                  '<country_code:([A-Z]{{2}})>', 1) as code,
+                   substr(BENEFICIARY_BIC8, 5, 2) as bc
+            from '{P}'
+            where BENEFICIARY_TOKENS like '%<country_code:%'
+        )
+        select code, bc, count(*) as n from b group by 1, 2
+    """).df()
+    total = float(d.n.sum())
+    by_addr = d.groupby("code").n.sum()
+    by_pay = d.groupby("bc").n.sum()
+    match = float(d.loc[d.code == d.bc, "n"].sum() / total)
+
+    payer = con.execute(f"""
+        select avg(case when regexp_extract(ORDERING_TOKENS,
+                             '<country_code:([A-Z]{{2}})>', 1) = substr(ORDERING_BIC8, 5, 2)
+                        then 1.0 else 0.0 end) as rate,
+               avg(case when regexp_extract(ORDERING_TOKENS,
+                             '<country_code:([A-Z]{{2}})>', 1) = {PATH_C}
+                        then 1.0 else 0.0 end) as head_rate,
+               count(*) as n
+        from '{P}' where ORDERING_TOKENS like '%<country_code:%'
+    """).df()
+
+    out = pd.DataFrame({
+        "code": sorted(set(by_addr.index) | set(by_pay.index)),
+    })
+    out["addr_n"] = out.code.map(by_addr).fillna(0).astype("int64")
+    out["pay_n"] = out.code.map(by_pay).fillna(0).astype("int64")
+    out["addr_share"] = out.addr_n / total
+    out["pay_share"] = out.pay_n / out.pay_n.sum()
+    save(out, "address_vs_volume.csv")
+
+    (OUT / "address_meta.json").write_text(json.dumps({
+        "payee_rows": int(total),
+        "payee_match": match,
+        "payer_rows": int(payer.n.iloc[0]),
+        "payer_match": float(payer.rate.iloc[0]),
+        "payer_head_match": float(payer.head_rate.iloc[0]),
+        "countries": int(len(out)),
+    }, indent=2), encoding="utf-8")
+    print(f"  payee match {match*100:.2f}% of {total:,.0f} rows; "
+          f"payer match {payer.rate.iloc[0]*100:.2f}% of {payer.n.iloc[0]:,}")
+
+
+def address_mix(con) -> None:
+    step("parties: which country each destination's payee addresses name")
+    d = con.execute(f"""
+        with b as (
+            select substr(BENEFICIARY_BIC8, 5, 2) as own,
+                   regexp_extract(BENEFICIARY_TOKENS,
+                                  '<country_code:([A-Z]{{2}})>', 1) as cc
+            from '{P}'
+            where BENEFICIARY_TOKENS like '%<country_code:%'
+        ), tops as (
+            select own, count(*) as n from b group by 1 order by n desc limit 10
+        ), agg as (
+            select b.own, b.cc, count(*) as n
+            from b join tops using (own) group by 1, 2
+        ), ranked as (
+            select *, sum(n) over (partition by own) as tot,
+                   row_number() over (partition by own order by n desc) as rk
+            from agg
+        )
+        select own, cc, n, tot, rk, n::double / tot as share
+        from ranked order by tot desc, rk
+    """).df()
+    save(d, "address_mix.csv")
+
+    m = con.execute(f"""
+        with b as (
+            select BENEFICIARY_BIC8 as bic,
+                   substr(BENEFICIARY_BIC8, 5, 2) as own,
+                   regexp_extract(BENEFICIARY_TOKENS,
+                                  '<country_code:([A-Z]{{2}})>', 1) as cc
+            from '{P}'
+            where BENEFICIARY_TOKENS like '%<country_code:%'
+        ), agg as (
+            select bic, own, cc, count(*) as n from b group by 1, 2, 3
+        ), top as (
+            select *, sum(n) over (partition by bic) as tot,
+                   row_number() over (partition by bic order by n desc) as rk
+            from agg
+        )
+        select count(distinct bic) as banks,
+               median(n::double / tot) as median_top,
+               avg(case when cc = own then 1.0 else 0.0 end) as own_top,
+               sum(n) as rows
+        from top where rk = 1
+    """).df()
+    (OUT / "address_mix_meta.json").write_text(json.dumps({
+        "banks": int(m.banks.iloc[0]),
+        "median_top": float(m.median_top.iloc[0]),
+        "own_top": float(m.own_top.iloc[0]),
+        "rows": int(m.rows.iloc[0]),
+    }, indent=2), encoding="utf-8")
+    print(f"  {int(m.banks.iloc[0]):,} banks; one country holds "
+          f"{m.median_top.iloc[0]*100:.0f}% of a bank's addresses at the median; "
+          f"{m.own_top.iloc[0]*100:.2f}% name their own country first")
+
+
+def anomaly_amounts(con) -> None:
+    step("anomalies: amount profile per label, with clean rows as the comparator")
+    d = con.execute(f"""
+        select coalesce(ANOMALY_TYPE, 'CLEAN') as label, count(*) as n,
+               median(USD_AMOUNT) as med,
+               quantile_cont(USD_AMOUNT, 0.9) as p90
+        from '{P}' where USD_AMOUNT > 0 and (ANOMALY_TYPE is not null or {CLEAN})
+        group by 1 order by med
+    """).df()
+    save(d, "anomaly_amounts.csv")
+    print(d.to_string(index=False))
+
+
+def repeat_gaps(con) -> None:
+    step("anomalies: how long after an identical payment the repeat arrives")
+    d = con.execute(f"""
+        with b as (
+            select ORDERING_ACCOUNT, BENEFICIARY_ACCOUNT, USD_AMOUNT, EPOCH_SECONDS,
+                   case when ANOMALY_TYPE = 'DUPLICATE_PAYMENT' then 1 else 0 end as dup
+            from '{P}'
+            where (ANOMALY_TYPE is null or ANOMALY_TYPE = 'DUPLICATE_PAYMENT')
+        ), l as (
+            select *, EPOCH_SECONDS - lag(EPOCH_SECONDS) over (
+                       partition by ORDERING_ACCOUNT, BENEFICIARY_ACCOUNT, USD_AMOUNT
+                       order by EPOCH_SECONDS) as gap,
+                   lag(dup) over (
+                       partition by ORDERING_ACCOUNT, BENEFICIARY_ACCOUNT, USD_AMOUNT
+                       order by EPOCH_SECONDS) as prev_dup
+            from b
+        ), p as (
+            select gap, greatest(dup, coalesce(prev_dup, 0)) as pair_dup
+            from l where gap is not null
+        )
+        select case
+                 when gap < 120 then 'under 2 min'
+                 when gap < 600 then '2-10 min'
+                 when gap < 1800 then '10-30 min'
+                 when gap < 3600 then '30-60 min'
+                 when gap < 21600 then '1-6 hours'
+                 when gap < 86400 then '6-24 hours'
+                 when gap < 259200 then '1-3 days'
+                 else '3-90 days' end as bucket,
+               case when pair_dup = 1 then 'duplicate' else 'normal' end as grp,
+               count(*) as n
+        from p group by 1, 2 order by 1, 2
+    """).df()
+    save(d, "repeat_gaps.csv")
+    print(f"  {int(d.n.sum()):,} repeat pairs")
+
+
 def main() -> None:
     con = connect()
     currency(con)
+    currency_two_sides(con)
     amounts(con)
+    country_shape(con)
+    amount_centred(con)
     duration(con)
+    settlement_grid(con)
     hours(con)
     business_vs_retail(con)
     parties(con)
+    address_vs_volume(con)
+    address_mix(con)
+    anomaly_amounts(con)
+    repeat_gaps(con)
     print("\ndone")
 
 
