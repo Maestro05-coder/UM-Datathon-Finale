@@ -24,3 +24,13 @@ desktop.ini
 .DS_Store
 .vscode/
 .idea/
+
+# --- Submission pack --------------------------------------------------------
+# The panel tables under submission/dashboard/data/ ARE the audit trail: each
+# number the pack draws is written to a CSV first, and build.py reads only those
+# CSVs. They are tracked even though the rules above ignore *.csv by default.
+!submission/dashboard/data/
+!submission/dashboard/data/*.csv
+!submission/dashboard/data/*.json
+!submission/deck/data/
+!submission/deck/data/*.csv
